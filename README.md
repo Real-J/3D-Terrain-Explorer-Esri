@@ -44,6 +44,9 @@ Each feature in the 3D Terrain Explorer is built to deliver hands-on, insightful
 Shows the use of "local feature" which allows for displaying altitude heatmap that is true to the local environment that is being viewed at the moment.
 
 ![Big Bear](demo_2.PNG)
+
+Converts the screen coordinates into geographic coordinates. Allowing the users to ping any point on the map to know about the altitude.  
+
 ---
 ## ⚙️ How to Run Locally
 
