@@ -39,7 +39,7 @@ Each feature in the 3D Terrain Explorer is built to deliver hands-on, insightful
 ---
 
 ## ⚡ Demo
-
+![Everest](demo 1.PNG)
 
 
 ---
@@ -52,7 +52,7 @@ Each feature in the 3D Terrain Explorer is built to deliver hands-on, insightful
    git clone https://github.com/Real-J/3d-terrain-explorer.git
    cd 3d-terrain-explorer
    ```
-2. Open `index.html` in any modern browser (Chrome, Firefox, Edge).
+2. Open `Explorer.html` in any modern browser (Chrome, Firefox, Edge).
 
 ---
 
