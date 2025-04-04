@@ -39,11 +39,14 @@ Each feature in the 3D Terrain Explorer is built to deliver hands-on, insightful
 ---
 
 ## ⚡ Demo
-![Everest](demo 1.PNG)
+![Everest](demo_1.PNG)
+
+Shows the use of "local feature" which allows for displaying altitude heatmap that is true to the local environment that is being viewed at the moment.
 
 
+
+![spline bottle](bottle.PNG)
 ---
-
 ## ⚙️ How to Run Locally
 
 ### Option 1: Open Directly
