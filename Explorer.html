@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>3D Terrain Explorer by Joy Mathew G</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
+  <script src="https://js.arcgis.com/4.29/"></script>
+  <style>
+    html, body, #viewDiv {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+    }
+
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 99;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px;
+      font-family: sans-serif;
+      font-size: 13px;
+      border-radius: 6px;
+      text-align: left;
+      width: 200px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    #watermark {
+      position: absolute;
+      top: 300px;
+      right: 20px;
+      z-index: 99;
+      font-size: 11px;
+      font-family: sans-serif;
+      color: #555;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 4px 8px;
+      border-radius: 4px;
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.15);
+    }
+
+    #legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: sans-serif;
+      font-size: 13px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+      width: 260px;
+    }
+
+    #legend-title {
+      margin-bottom: 5px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    #legend-bar {
+      height: 12px;
+      width: 100%;
+      background: linear-gradient(to right, green, yellow, red);
+      border: 1px solid #ccc;
+      margin-bottom: 6px;
+    }
+
+    #legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      padding-top: 2px;
+    }
+
+    .fly-btn {
+      margin-top: 6px;
+      display: block;
+      width: 100%;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="viewDiv"></div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <button id="generateBtn">Paint Elevation Heatmap</button><br><br>
+
+    <label><input type="radio" name="mode" value="local" checked> Local Mode</label><br>
+    <label><input type="radio" name="mode" value="global"> Global Mode</label>
+
+    <hr>
+    <strong>Fly To:</strong>
+    <button class="fly-btn" onclick="flyTo('everest')">🏔 Everest</button>
+    <button class="fly-btn" onclick="flyTo('fuji')">🌋 Mount Fuji</button>
+    <button class="fly-btn" onclick="flyTo('bigbear')">🏞️ Big Bear, CA</button>
+    <button class="fly-btn" onclick="flyTo('canyon')">🏜 Grand Canyon</button>
+    <button class="fly-btn" onclick="flyTo('mammoth')">🎿 Mammoth Mountain, CA</button>
+  </div>
+
+  <!-- Watermark -->
+  <div id="watermark">Tool made by Joy Mathew G</div>
+
+  <!-- Legend -->
+  <div id="legend">
+    <div id="legend-title">Elevation (meters)</div>
+    <div id="legend-bar"></div>
+    <div id="legend-labels">
+      <span id="legend-0">Low</span>
+      <span id="legend-25">25%</span>
+      <span id="legend-50">50%</span>
+      <span id="legend-75">75%</span>
+      <span id="legend-100">High</span>
+    </div>
+  </div>
+
+  <script>
+    require([
+      "esri/WebScene",
+      "esri/views/SceneView",
+      "esri/Graphic",
+      "esri/layers/GraphicsLayer",
+      "esri/geometry/Polygon",
+      "esri/geometry/Point"
+    ], function (WebScene, SceneView, Graphic, GraphicsLayer, Polygon, Point) {
+
+      const scene = new WebScene({
+        basemap: "satellite",
+        ground: "world-elevation"
+      });
+
+      const view = new SceneView({
+        container: "viewDiv",
+        map: scene,
+        qualityProfile: "high",
+        camera: {
+          position: { latitude: 27.9881, longitude: 86.9250, z: 10000 },
+          tilt: 70
+        },
+        popup: {
+          defaultPopupTemplateEnabled: false
+        },
+        environment: {
+          lighting: {
+            type: "virtual",
+            directShadowsEnabled: false,
+            ambientOcclusionEnabled: false
+          },
+          atmosphere: {
+            quality: "high"
+          }
+        }
+      });
+
+      const surfaceLayer = new GraphicsLayer();
+      scene.add(surfaceLayer);
+
+      let colorMode = "local";
+
+      document.querySelectorAll("input[name='mode']").forEach((input) => {
+        input.addEventListener("change", (e) => {
+          colorMode = e.target.value;
+        });
+      });
+
+      document.getElementById("generateBtn").addEventListener("click", generateHeatPolygons);
+
+      async function generateHeatPolygons() {
+        surfaceLayer.removeAll();
+
+        const extent = view.extent;
+        const sampler = await view.map.ground.createElevationSampler(extent);
+
+        const cols = 40;
+        const rows = 40;
+        const dx = extent.width / cols;
+        const dy = extent.height / rows;
+
+        const zVals = [];
+        const cellData = [];
+
+        for (let i = 0; i < cols; i++) {
+          for (let j = 0; j < rows; j++) {
+            const x0 = extent.xmin + i * dx;
+            const y0 = extent.ymin + j * dy;
+            const x1 = x0 + dx;
+            const y1 = y0 + dy;
+
+            const corners = [
+              new Point({ x: x0, y: y0, spatialReference: extent.spatialReference }),
+              new Point({ x: x1, y: y0, spatialReference: extent.spatialReference }),
+              new Point({ x: x1, y: y1, spatialReference: extent.spatialReference }),
+              new Point({ x: x0, y: y1, spatialReference: extent.spatialReference })
+            ];
+
+            const elevations = corners.map(p => sampler.queryElevation(p).z);
+            const avgZ = elevations.reduce((a, b) => a + b, 0) / elevations.length;
+            zVals.push(avgZ);
+
+            const polygon = new Polygon({
+              rings: [
+                [x0, y0],
+                [x1, y0],
+                [x1, y1],
+                [x0, y1],
+                [x0, y0]
+              ],
+              spatialReference: extent.spatialReference
+            });
+
+            cellData.push({ polygon, avgZ });
+          }
+        }
+
+        let zMin, zMax;
+        if (colorMode === "global") {
+          zMin = 0;
+          zMax = 9000;
+        } else {
+          zMin = Math.min(...zVals);
+          zMax = Math.max(...zVals);
+        }
+
+        for (const { polygon, avgZ } of cellData) {
+          const graphic = new Graphic({
+            geometry: polygon,
+            symbol: {
+              type: "simple-fill",
+              color: getHeatColor(avgZ, zMin, zMax),
+              outline: null
+            }
+          });
+          surfaceLayer.add(graphic);
+        }
+
+        const range = zMax - zMin;
+        document.getElementById("legend-0").textContent = `${zMin.toFixed(0)} m`;
+        document.getElementById("legend-25").textContent = `${(zMin + range * 0.25).toFixed(0)} m`;
+        document.getElementById("legend-50").textContent = `${(zMin + range * 0.50).toFixed(0)} m`;
+        document.getElementById("legend-75").textContent = `${(zMin + range * 0.75).toFixed(0)} m`;
+        document.getElementById("legend-100").textContent = `${zMax.toFixed(0)} m`;
+      }
+
+      function getHeatColor(z, zMin, zMax) {
+        const norm = Math.min(1, Math.max(0, (z - zMin) / (zMax - zMin)));
+        const r = Math.floor(255 * norm);
+        const g = Math.floor(255 * (1 - norm));
+        return [r, g, 100, 0.7];
+      }
+
+      view.on("click", async function (event) {
+        const point = view.toMap({ x: event.x, y: event.y });
+        const elevation = await view.map.ground.queryElevation(point);
+        view.popup.open({
+          title: "Elevation Sample",
+          location: point,
+          content: `
+            <b>Lat:</b> ${point.latitude.toFixed(4)}<br>
+            <b>Lon:</b> ${point.longitude.toFixed(4)}<br>
+            <b>Elevation:</b> ${elevation.geometry.z.toFixed(2)} m
+          `
+        });
+      });
+
+      window.flyTo = function (place) {
+        const targets = {
+          everest: { lat: 27.9881, lon: 86.9250, z: 10000 },
+          fuji: { lat: 35.3606, lon: 138.7274, z: 8000 },
+          bigbear: { lat: 34.2439, lon: -116.9114, z: 7000 },
+          canyon: { lat: 36.1069, lon: -112.1129, z: 9000 },
+          mammoth: { lat: 37.6308, lon: -119.0321, z: 9000 } // 🎿 Mammoth Mountain, CA
+        };
+        const t = targets[place];
+        if (!t) return;
+        view.goTo({
+          position: {
+            latitude: t.lat,
+            longitude: t.lon,
+            z: t.z
+          },
+          tilt: 70
+        });
+      };
+
+    });
+  </script>
+</body>
+</html>
